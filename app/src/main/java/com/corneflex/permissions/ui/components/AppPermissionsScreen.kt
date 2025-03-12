@@ -9,7 +9,9 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.FilterAlt
+import androidx.compose.material.icons.filled.Security
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -41,6 +43,11 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.corneflex.permissions.model.DangerLevel
 import com.corneflex.permissions.model.PermissionGroup
 import com.corneflex.permissions.viewmodel.AppPermissionsViewModel
+import com.corneflex.permissions.ui.components.AppCard
+import com.corneflex.permissions.ui.components.PlayStoreFilterCard
+import com.corneflex.permissions.ui.components.SearchBar
+import com.corneflex.permissions.ui.components.SystemAppFilterCard
+import com.corneflex.permissions.ui.components.WhitelistManagerCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -56,9 +63,10 @@ fun AppPermissionsScreen(
     val isWhitelistActive by viewModel.isWhitelistFilterActive.observeAsState(initial = false)
     val isPlayStoreFilterActive by viewModel.playStoreFilterActive.observeAsState(initial = false)
     
-    // Show filter UI states
+    // Filter toggles
     var showWhitelistFilter by remember { mutableStateOf(false) }
     var showPlayStoreFilter by remember { mutableStateOf(false) }
+    var showSystemAppFilter by remember { mutableStateOf(false) }
     
     // Load data when the screen is first shown
     DisposableEffect(lifecycleOwner) {
@@ -77,7 +85,7 @@ fun AppPermissionsScreen(
                         if (showPlayStoreFilter) showWhitelistFilter = false
                     }) {
                         Icon(
-                            imageVector = Icons.Default.Store,
+                            imageVector = Icons.Default.PlayArrow,
                             contentDescription = "Play Store Filter",
                             tint = if (isPlayStoreFilterActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
@@ -92,6 +100,14 @@ fun AppPermissionsScreen(
                             imageVector = Icons.Default.List,
                             contentDescription = "Whitelist Filter",
                             tint = if (isWhitelistActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    
+                    // System App filter button
+                    IconButton(onClick = { showSystemAppFilter = !showSystemAppFilter }) {
+                        Icon(
+                            imageVector = Icons.Default.Security,
+                            contentDescription = "System App Filter"
                         )
                     }
                 }
@@ -110,6 +126,12 @@ fun AppPermissionsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 8.dp)
+                )
+            }
+            
+            if (showSystemAppFilter) {
+                SystemAppFilterCard(
+                    viewModel = viewModel
                 )
             }
             

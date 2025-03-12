@@ -41,11 +41,13 @@ object AppPermissionUtils {
      * Create an AppInfo object from a PackageInfo
      */
     private fun createAppInfo(packageManager: PackageManager, packageInfo: PackageInfo, context: Context): AppInfo? {
-        // Skip system apps if needed
-        if (packageInfo.applicationInfo?.flags == ApplicationInfo.FLAG_SYSTEM) {
-            // Uncomment to skip system apps
-             return null
-        }
+        // Set the isSystemApp flag
+        val isSystem = (packageInfo.applicationInfo?.flags?.and(ApplicationInfo.FLAG_SYSTEM) != 0)
+        
+        // Skip system apps if needed - commented out to allow showing system apps
+        // if (isSystem) {
+        //     return null
+        // }
 
         val appName = packageInfo.applicationInfo?.loadLabel(packageManager).toString()
         val packageName = packageInfo.packageName
@@ -62,6 +64,19 @@ object AppPermissionUtils {
             permissions = permissions,
             installerPackageName = installerPackageName
         )
+    }
+    
+    /**
+     * Check if an app is a system app
+     */
+    fun isSystemApp(app: AppInfo, context: Context): Boolean {
+        return try {
+            val packageManager = context.packageManager
+            val applicationInfo = packageManager.getApplicationInfo(app.packageName, 0)
+            (applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
+        } catch (e: Exception) {
+            false
+        }
     }
     
     /**

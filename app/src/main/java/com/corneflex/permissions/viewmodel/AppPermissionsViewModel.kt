@@ -54,6 +54,13 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     private val _playStoreFilterMode = MutableLiveData<PlayStoreFilterMode>(PlayStoreFilterMode.SHOW_ONLY_PLAY_STORE)
     val playStoreFilterMode: LiveData<PlayStoreFilterMode> = _playStoreFilterMode
 
+    // System app filter
+    private val _systemAppFilterActive = MutableLiveData<Boolean>(false)
+    val isSystemAppFilterActive: LiveData<Boolean> = _systemAppFilterActive
+    
+    private val _systemAppFilterMode = MutableLiveData<SystemAppFilterMode>(SystemAppFilterMode.EXCLUDE_SYSTEM_APPS)
+    val systemAppFilterMode: LiveData<SystemAppFilterMode> = _systemAppFilterMode
+
     // Keep all permission groups in memory for faster searching
     private var allPermissionGroups = listOf<PermissionGroup>()
     
@@ -90,6 +97,11 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
                     // Apply Play Store filter if active
                     if (_playStoreFilterActive.value == true) {
                         filteredApps = applyPlayStoreFilter(filteredApps)
+                    }
+                    
+                    // Apply System Apps filter if active
+                    if (_systemAppFilterActive.value == true) {
+                        filteredApps = applySystemAppFilter(filteredApps)
                     }
                     
                     _installedApps.postValue(filteredApps)
@@ -138,6 +150,21 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     }
     
     /**
+     * Apply system app filtering to apps list
+     */
+    private fun applySystemAppFilter(apps: List<AppInfo>): List<AppInfo> {
+        return when (_systemAppFilterMode.value) {
+            SystemAppFilterMode.SHOW_ONLY_SYSTEM_APPS -> {
+                apps.filter { app -> AppPermissionUtils.isSystemApp(app, getApplication()) }
+            }
+            SystemAppFilterMode.EXCLUDE_SYSTEM_APPS -> {
+                apps.filter { app -> !AppPermissionUtils.isSystemApp(app, getApplication()) }
+            }
+            else -> apps
+        }
+    }
+    
+    /**
      * Toggle whitelist filtering
      */
     fun toggleWhitelistFilter(enabled: Boolean) {
@@ -169,6 +196,24 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     fun setPlayStoreFilterMode(mode: PlayStoreFilterMode) {
         _playStoreFilterMode.value = mode
         if (_playStoreFilterActive.value == true) {
+            refreshData()
+        }
+    }
+    
+    /**
+     * Toggle system app filtering
+     */
+    fun toggleSystemAppFilter(enabled: Boolean) {
+        _systemAppFilterActive.value = enabled
+        refreshData()
+    }
+    
+    /**
+     * Set system app filter mode
+     */
+    fun setSystemAppFilterMode(mode: SystemAppFilterMode) {
+        _systemAppFilterMode.value = mode
+        if (_systemAppFilterActive.value == true) {
             refreshData()
         }
     }
@@ -285,6 +330,11 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
                         filteredApps = applyPlayStoreFilter(filteredApps)
                     }
                     
+                    // Apply System Apps filter if active
+                    if (_systemAppFilterActive.value == true) {
+                        filteredApps = applySystemAppFilter(filteredApps)
+                    }
+                    
                     _installedApps.postValue(filteredApps)
                     
                     // Group permissions by danger level and associate apps
@@ -390,5 +440,13 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     enum class PlayStoreFilterMode {
         SHOW_ONLY_PLAY_STORE,  // Show only apps installed from Play Store
         EXCLUDE_PLAY_STORE     // Exclude apps installed from Play Store
+    }
+    
+    /**
+     * System app filter modes
+     */
+    enum class SystemAppFilterMode {
+        SHOW_ONLY_SYSTEM_APPS,  // Show only system apps
+        EXCLUDE_SYSTEM_APPS     // Exclude system apps
     }
 } 
