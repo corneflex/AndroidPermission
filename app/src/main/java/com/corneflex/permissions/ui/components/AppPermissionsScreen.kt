@@ -13,6 +13,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -27,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SearchBar
 import androidx.compose.material3.Tab
@@ -49,6 +52,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.corneflex.permissions.model.DangerLevel
@@ -71,6 +75,9 @@ fun AppPermissionsScreen(
     // Filter toggle
     var showFilterMenu by remember { mutableStateOf(false) }
     
+    // Search bar active state
+    var searchBarActive by remember { mutableStateOf(false) }
+    
     // Scrolling state
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
@@ -82,8 +89,14 @@ fun AppPermissionsScreen(
     // Track scroll position changes and close filter menu with animation when scrolling starts
     val isScrolling by remember { derivedStateOf { scrollState.isScrollInProgress } }
     LaunchedEffect(isScrolling) {
-        if (isScrolling && showFilterMenu) {
-            showFilterMenu = false
+        if (isScrolling) {
+            if (showFilterMenu) {
+                showFilterMenu = false
+            }
+            if (searchBarActive) {
+                searchBarActive = false
+                focusManager.clearFocus()
+            }
         }
     }
     
@@ -135,14 +148,14 @@ fun AppPermissionsScreen(
                     enter = slideInVertically(
                         initialOffsetY = { -it }, // Slide in from top
                         animationSpec = spring(
-                            dampingRatio = Spring.DampingRatioMediumBouncy,
-                            stiffness = Spring.StiffnessMedium
+                            dampingRatio = Spring.DampingRatioLowBouncy,
+                            stiffness = Spring.StiffnessVeryLow
                         )
-                    ) + fadeIn(animationSpec = tween(150)),
+                    ) + fadeIn(animationSpec = tween(300)),
                     exit = slideOutVertically(
                         targetOffsetY = { -it }, // Slide out to top
-                        animationSpec = tween(200)
-                    ) + fadeOut(animationSpec = tween(150))
+                        animationSpec = tween(250)
+                    ) + fadeOut(animationSpec = tween(200))
                 ) {
                     Box(
                         modifier = Modifier
@@ -161,11 +174,18 @@ fun AppPermissionsScreen(
                     }
                 }
                 
-                // Search bar
-                PermissionSearchBar(
-                    searchQuery = searchQuery,
-                    onSearchQueryChange = { viewModel.searchPermissions(it) },
+                // Custom Search Bar (replacing SearchBar)
+                CustomSearchBar(
+                    query = searchQuery,
+                    onQueryChange = { viewModel.searchPermissions(it) },
                     onClearSearch = { viewModel.clearSearch() },
+                    onActiveChange = { active ->
+                        searchBarActive = active
+                        if (!active) {
+                            focusManager.clearFocus()
+                        }
+                    },
+                    active = searchBarActive,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp)
@@ -193,63 +213,100 @@ fun AppPermissionsScreen(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun PermissionSearchBar(
-    searchQuery: String,
-    onSearchQueryChange: (String) -> Unit,
+fun CustomSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
     onClearSearch: () -> Unit,
+    onActiveChange: (Boolean) -> Unit,
+    active: Boolean,
     modifier: Modifier = Modifier
 ) {
-    var active by remember { mutableStateOf(false) }
     val keyboardController = LocalSoftwareKeyboardController.current
     
-    SearchBar(
-        query = searchQuery,
-        onQueryChange = onSearchQueryChange,
-        onSearch = {
-            active = false
-            keyboardController?.hide()
-        },
-        active = active,
-        onActiveChange = { active = it },
-        placeholder = { Text("Search permissions, apps or package IDs...") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
-        trailingIcon = {
-            if (searchQuery.isNotEmpty()) {
-                IconButton(onClick = onClearSearch) {
-                    Icon(Icons.Default.Clear, contentDescription = "Clear search")
+    Box(modifier = modifier) {
+        // Use a simpler approach with OutlinedTextField when not active
+        if (!active) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onActiveChange(true) }
+                    .padding(vertical = 8.dp, horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = "Search",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(end = 8.dp)
+                )
+                Text(
+                    text = if (query.isEmpty()) "Search permissions, apps or package IDs..." else query,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (query.isEmpty()) MaterialTheme.colorScheme.onSurfaceVariant 
+                            else MaterialTheme.colorScheme.onSurface
+                )
+                if (query.isNotEmpty()) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    IconButton(onClick = onClearSearch) {
+                        Icon(
+                            imageVector = Icons.Default.Clear,
+                            contentDescription = "Clear search"
+                        )
+                    }
                 }
             }
-        },
-        modifier = modifier
-    ) {
-        // Search suggestions
-        if (active) {
-            Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        } else {
+            // Use SearchBar with constraints when active
+            SearchBar(
+                query = query,
+                onQueryChange = onQueryChange,
+                onSearch = {
+                    onActiveChange(false)
+                    keyboardController?.hide()
+                },
+                active = active,
+                onActiveChange = onActiveChange,
+                placeholder = { Text("Search permissions, apps or package IDs...") },
+                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search") },
+                trailingIcon = {
+                    if (query.isNotEmpty()) {
+                        IconButton(onClick = onClearSearch) {
+                            Icon(Icons.Default.Clear, contentDescription = "Clear search")
+                        }
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.Center)
             ) {
-                Text(
-                    text = "Search for:",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                
-                Text(
-                    text = "• Permission names (e.g., 'camera', 'location')",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 4.dp)
-                )
-                
-                Text(
-                    text = "• App names (e.g., 'WhatsApp', 'Chrome')",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
-                
-                Text(
-                    text = "• Package IDs (e.g., 'com.android', 'org.mozilla')",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(top = 2.dp)
-                )
+                // Search suggestions
+                Column(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                ) {
+                    Text(
+                        text = "Search for:",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    
+                    Text(
+                        text = "• Permission names (e.g., 'camera', 'location')",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
+                    
+                    Text(
+                        text = "• App names (e.g., 'WhatsApp', 'Chrome')",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                    
+                    Text(
+                        text = "• Package IDs (e.g., 'com.android', 'org.mozilla')",
+                        style = MaterialTheme.typography.bodyMedium,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
             }
         }
     }
