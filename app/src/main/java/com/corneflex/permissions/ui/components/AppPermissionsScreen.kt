@@ -7,8 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -71,7 +71,7 @@ fun AppPermissionsScreen(
                     // Whitelist filter button
                     IconButton(onClick = { showWhitelistFilter = !showWhitelistFilter }) {
                         Icon(
-                            imageVector = Icons.Default.FilterList,
+                            imageVector = Icons.Default.List,
                             contentDescription = "Filter",
                             tint = if (isWhitelistActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
