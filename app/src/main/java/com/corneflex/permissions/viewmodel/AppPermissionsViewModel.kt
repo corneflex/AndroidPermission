@@ -41,6 +41,9 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     private val _whitelistedApps = MutableLiveData<Set<String>>(emptySet())
     val whitelistedApps: LiveData<Set<String>> = _whitelistedApps
     
+    private val _regexPatterns = MutableLiveData<Set<String>>(emptySet())
+    val regexPatterns: LiveData<Set<String>> = _regexPatterns
+    
     private val _whitelistFilterMode = MutableLiveData<WhitelistFilterMode>(WhitelistFilterMode.SHOW_ONLY_WHITELISTED)
     val whitelistFilterMode: LiveData<WhitelistFilterMode> = _whitelistFilterMode
 
@@ -65,9 +68,9 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
                     // Load all apps
                     allApps = AppPermissionUtils.getInstalledApps(getApplication())
                     
-                    // Get current whitelist
-                    val whitelist = whitelistManager.getWhitelistedApps()
-                    _whitelistedApps.postValue(whitelist)
+                    // Get current whitelist and regex patterns
+                    _whitelistedApps.postValue(whitelistManager.getWhitelistedApps())
+                    _regexPatterns.postValue(whitelistManager.getRegexPatterns())
                     
                     // Apply filters if active
                     val filteredApps = if (_isWhitelistFilterActive.value == true) {
@@ -95,14 +98,12 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
      * Apply whitelist filtering to apps list
      */
     private fun applyWhitelistFilter(apps: List<AppInfo>): List<AppInfo> {
-        val whitelist = whitelistManager.getWhitelistedApps()
-        
         return when (_whitelistFilterMode.value) {
             WhitelistFilterMode.SHOW_ONLY_WHITELISTED -> {
-                apps.filter { it.packageName in whitelist }
+                apps.filter { app -> whitelistManager.isWhitelisted(app.packageName) }
             }
             WhitelistFilterMode.EXCLUDE_WHITELISTED -> {
-                apps.filter { it.packageName !in whitelist }
+                apps.filter { app -> !whitelistManager.isWhitelisted(app.packageName) }
             }
             else -> apps
         }
@@ -134,6 +135,36 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
             withContext(Dispatchers.IO) {
                 whitelistManager.addToWhitelist(packageName)
                 _whitelistedApps.postValue(whitelistManager.getWhitelistedApps())
+                if (_isWhitelistFilterActive.value == true) {
+                    refreshData()
+                }
+            }
+        }
+    }
+    
+    /**
+     * Add a regex pattern to the whitelist
+     */
+    fun addRegexPattern(pattern: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                whitelistManager.addRegexPattern(pattern)
+                _regexPatterns.postValue(whitelistManager.getRegexPatterns())
+                if (_isWhitelistFilterActive.value == true) {
+                    refreshData()
+                }
+            }
+        }
+    }
+    
+    /**
+     * Remove a regex pattern from the whitelist
+     */
+    fun removeRegexPattern(pattern: String) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                whitelistManager.removeRegexPattern(pattern)
+                _regexPatterns.postValue(whitelistManager.getRegexPatterns())
                 if (_isWhitelistFilterActive.value == true) {
                     refreshData()
                 }

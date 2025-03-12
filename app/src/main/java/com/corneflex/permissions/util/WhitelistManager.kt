@@ -30,9 +30,9 @@ class WhitelistManager(context: Context) {
     )
     
     /**
-     * Get the set of whitelisted package names
+     * Get the set of exact package names in the whitelist (non-regex patterns)
      */
-    fun getWhitelistedApps(): Set<String> {
+    fun getExactWhitelistedApps(): Set<String> {
         val customWhitelist = sharedPreferences.getStringSet(KEY_WHITELISTED_APPS, emptySet()) ?: emptySet()
         return if (includeSystemWhitelist()) {
             customWhitelist.union(defaultSystemWhitelist)
@@ -42,7 +42,48 @@ class WhitelistManager(context: Context) {
     }
     
     /**
-     * Add an app to the whitelist
+     * Get the set of regex patterns in the whitelist
+     */
+    fun getRegexPatterns(): Set<String> {
+        return sharedPreferences.getStringSet(KEY_REGEX_PATTERNS, emptySet()) ?: emptySet()
+    }
+    
+    /**
+     * Check if an app is whitelisted using exact match or regex patterns
+     */
+    fun isWhitelisted(packageName: String): Boolean {
+        // Check exact matches first (more efficient)
+        if (packageName in getExactWhitelistedApps()) {
+            return true
+        }
+        
+        // Check regex patterns
+        return getRegexPatterns().any { pattern ->
+            try {
+                val regex = Regex(pattern)
+                regex.matches(packageName)
+            } catch (e: Exception) {
+                // If regex is invalid, just do a simple wildcard matching
+                if (pattern.endsWith("*")) {
+                    val prefix = pattern.substring(0, pattern.length - 1)
+                    packageName.startsWith(prefix)
+                } else {
+                    false
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get all whitelisted packages (for UI display purposes)
+     * This combines exact matches and doesn't include regex patterns
+     */
+    fun getWhitelistedApps(): Set<String> {
+        return getExactWhitelistedApps()
+    }
+    
+    /**
+     * Add an app to the whitelist (exact match)
      */
     fun addToWhitelist(packageName: String) {
         val current = sharedPreferences.getStringSet(KEY_WHITELISTED_APPS, emptySet())?.toMutableSet() ?: mutableSetOf()
@@ -53,7 +94,18 @@ class WhitelistManager(context: Context) {
     }
     
     /**
-     * Remove an app from the whitelist
+     * Add a regex pattern to the whitelist
+     */
+    fun addRegexPattern(pattern: String) {
+        val current = sharedPreferences.getStringSet(KEY_REGEX_PATTERNS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.add(pattern)
+        sharedPreferences.edit {
+            putStringSet(KEY_REGEX_PATTERNS, current)
+        }
+    }
+    
+    /**
+     * Remove an exact match from the whitelist
      */
     fun removeFromWhitelist(packageName: String) {
         val current = sharedPreferences.getStringSet(KEY_WHITELISTED_APPS, emptySet())?.toMutableSet() ?: mutableSetOf()
@@ -64,19 +116,24 @@ class WhitelistManager(context: Context) {
     }
     
     /**
-     * Clear the custom whitelist
+     * Remove a regex pattern from the whitelist
      */
-    fun clearWhitelist() {
+    fun removeRegexPattern(pattern: String) {
+        val current = sharedPreferences.getStringSet(KEY_REGEX_PATTERNS, emptySet())?.toMutableSet() ?: mutableSetOf()
+        current.remove(pattern)
         sharedPreferences.edit {
-            putStringSet(KEY_WHITELISTED_APPS, emptySet())
+            putStringSet(KEY_REGEX_PATTERNS, current)
         }
     }
     
     /**
-     * Check if an app is whitelisted
+     * Clear the custom whitelist (both exact matches and regex patterns)
      */
-    fun isWhitelisted(packageName: String): Boolean {
-        return packageName in getWhitelistedApps()
+    fun clearWhitelist() {
+        sharedPreferences.edit {
+            putStringSet(KEY_WHITELISTED_APPS, emptySet())
+            putStringSet(KEY_REGEX_PATTERNS, emptySet())
+        }
     }
     
     /**
@@ -98,6 +155,7 @@ class WhitelistManager(context: Context) {
     companion object {
         private const val WHITELIST_PREFS_NAME = "app_whitelist_prefs"
         private const val KEY_WHITELISTED_APPS = "whitelisted_apps"
+        private const val KEY_REGEX_PATTERNS = "regex_patterns"
         private const val KEY_INCLUDE_SYSTEM_WHITELIST = "include_system_whitelist"
     }
 } 
