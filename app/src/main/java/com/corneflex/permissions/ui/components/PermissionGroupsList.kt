@@ -41,8 +41,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.corneflex.permissions.model.AppInfo
 import com.corneflex.permissions.model.PermissionGroup
+import com.corneflex.permissions.viewmodel.AppPermissionsViewModel
 
 @Composable
 fun PermissionGroupsList(
@@ -155,6 +157,7 @@ fun AppItem(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.corneflex.permissions.viewmodel.AppPermissionsViewModel>()
     
     Row(
         modifier = modifier
@@ -183,7 +186,9 @@ fun AppItem(
         Spacer(modifier = Modifier.width(16.dp))
         
         // App name and package
-        Column {
+        Column(
+            modifier = Modifier.weight(1f)
+        ) {
             Text(
                 text = app.appName,
                 style = MaterialTheme.typography.bodyLarge,
@@ -198,5 +203,11 @@ fun AppItem(
                 overflow = TextOverflow.Ellipsis
             )
         }
+        
+        // Whitelist action
+        AppWhitelistAction(
+            app = app,
+            viewModel = viewModel
+        )
     }
 } 

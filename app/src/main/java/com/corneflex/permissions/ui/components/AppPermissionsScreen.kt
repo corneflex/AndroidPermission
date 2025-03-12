@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -19,6 +20,7 @@ import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +52,10 @@ fun AppPermissionsScreen(
     val isSearchActive by viewModel.isSearchActive.observeAsState(initial = false)
     val searchResults by viewModel.searchResults.observeAsState(initial = emptyList())
     val searchQuery by viewModel.searchQuery.observeAsState(initial = "")
+    val isWhitelistActive by viewModel.isWhitelistFilterActive.observeAsState(initial = false)
+    
+    // Show whitelist UI state
+    var showWhitelistFilter by remember { mutableStateOf(false) }
     
     // Load data when the screen is first shown
     DisposableEffect(lifecycleOwner) {
@@ -60,7 +66,17 @@ fun AppPermissionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("App Permissions") }
+                title = { Text("App Permissions") },
+                actions = {
+                    // Whitelist filter button
+                    IconButton(onClick = { showWhitelistFilter = !showWhitelistFilter }) {
+                        Icon(
+                            imageVector = Icons.Default.FilterList,
+                            contentDescription = "Filter",
+                            tint = if (isWhitelistActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
             )
         }
     ) { paddingValues ->
@@ -69,6 +85,16 @@ fun AppPermissionsScreen(
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
+            // Whitelist filter card (only shown when toggled)
+            if (showWhitelistFilter) {
+                WhitelistManagerCard(
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+            }
+            
             // Search bar
             PermissionSearchBar(
                 searchQuery = searchQuery,
