@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Store
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -53,9 +54,11 @@ fun AppPermissionsScreen(
     val searchResults by viewModel.searchResults.observeAsState(initial = emptyList())
     val searchQuery by viewModel.searchQuery.observeAsState(initial = "")
     val isWhitelistActive by viewModel.isWhitelistFilterActive.observeAsState(initial = false)
+    val isPlayStoreFilterActive by viewModel.playStoreFilterActive.observeAsState(initial = false)
     
-    // Show whitelist UI state
+    // Show filter UI states
     var showWhitelistFilter by remember { mutableStateOf(false) }
+    var showPlayStoreFilter by remember { mutableStateOf(false) }
     
     // Load data when the screen is first shown
     DisposableEffect(lifecycleOwner) {
@@ -68,11 +71,26 @@ fun AppPermissionsScreen(
             TopAppBar(
                 title = { Text("App Permissions") },
                 actions = {
+                    // Play Store filter button
+                    IconButton(onClick = { 
+                        showPlayStoreFilter = !showPlayStoreFilter
+                        if (showPlayStoreFilter) showWhitelistFilter = false
+                    }) {
+                        Icon(
+                            imageVector = Icons.Default.Store,
+                            contentDescription = "Play Store Filter",
+                            tint = if (isPlayStoreFilterActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                    
                     // Whitelist filter button
-                    IconButton(onClick = { showWhitelistFilter = !showWhitelistFilter }) {
+                    IconButton(onClick = { 
+                        showWhitelistFilter = !showWhitelistFilter
+                        if (showWhitelistFilter) showPlayStoreFilter = false
+                    }) {
                         Icon(
                             imageVector = Icons.Default.List,
-                            contentDescription = "Filter",
+                            contentDescription = "Whitelist Filter",
                             tint = if (isWhitelistActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -85,9 +103,18 @@ fun AppPermissionsScreen(
                 .padding(paddingValues)
                 .fillMaxSize()
         ) {
-            // Whitelist filter card (only shown when toggled)
+            // Filter cards (only shown when toggled)
             if (showWhitelistFilter) {
                 WhitelistManagerCard(
+                    viewModel = viewModel,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp)
+                )
+            }
+            
+            if (showPlayStoreFilter) {
+                PlayStoreFilterCard(
                     viewModel = viewModel,
                     modifier = Modifier
                         .fillMaxWidth()

@@ -15,6 +15,9 @@ import com.corneflex.permissions.model.PermissionInfo as AppPermissionInfo
  */
 object AppPermissionUtils {
 
+    // Google Play Store installer package
+    const val PLAY_STORE_INSTALLER_PACKAGE = "com.android.vending"
+    
     /**
      * Get all installed apps on the device with their permissions
      * @param context Android context
@@ -30,14 +33,14 @@ object AppPermissionUtils {
         }
 
         return installedPackages.mapNotNull { packageInfo ->
-            createAppInfo(packageManager, packageInfo)
+            createAppInfo(packageManager, packageInfo, context)
         }
     }
 
     /**
      * Create an AppInfo object from a PackageInfo
      */
-    private fun createAppInfo(packageManager: PackageManager, packageInfo: PackageInfo): AppInfo? {
+    private fun createAppInfo(packageManager: PackageManager, packageInfo: PackageInfo, context: Context): AppInfo? {
         // Skip system apps if needed
         if (packageInfo.applicationInfo?.flags == ApplicationInfo.FLAG_SYSTEM) {
             // Uncomment to skip system apps
@@ -48,13 +51,42 @@ object AppPermissionUtils {
         val packageName = packageInfo.packageName
         val icon = packageInfo.applicationInfo?.loadIcon(packageManager)
         val permissions = getPermissionsForPackage(packageManager, packageInfo)
+        
+        // Get the installer package name
+        val installerPackageName = getInstallerPackageName(context, packageName)
 
         return AppInfo(
             packageName = packageName,
             appName = appName,
             icon = icon,
-            permissions = permissions
+            permissions = permissions,
+            installerPackageName = installerPackageName
         )
+    }
+    
+    /**
+     * Get the installer package name for an app (who installed this app)
+     */
+    private fun getInstallerPackageName(context: Context, packageName: String): String? {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val packageManager = context.packageManager
+                val installerPackageInfo = packageManager.getInstallSourceInfo(packageName)
+                installerPackageInfo.initiatingPackageName
+            } else {
+                @Suppress("DEPRECATION")
+                context.packageManager.getInstallerPackageName(packageName)
+            }
+        } catch (e: Exception) {
+            null
+        }
+    }
+    
+    /**
+     * Check if an app was installed from the Play Store
+     */
+    fun isInstalledFromPlayStore(app: AppInfo): Boolean {
+        return app.installerPackageName == PLAY_STORE_INSTALLER_PACKAGE
     }
 
     /**

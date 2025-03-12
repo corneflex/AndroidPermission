@@ -19,6 +19,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.Divider
 import androidx.compose.material3.Icon
@@ -44,6 +46,7 @@ import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.corneflex.permissions.model.AppInfo
 import com.corneflex.permissions.model.PermissionGroup
+import com.corneflex.permissions.util.AppPermissionUtils
 import com.corneflex.permissions.viewmodel.AppPermissionsViewModel
 
 @Composable
@@ -158,6 +161,7 @@ fun AppItem(
 ) {
     val context = LocalContext.current
     val viewModel = androidx.lifecycle.viewmodel.compose.viewModel<com.corneflex.permissions.viewmodel.AppPermissionsViewModel>()
+    val isFromPlayStore = AppPermissionUtils.isInstalledFromPlayStore(app)
     
     Row(
         modifier = modifier
@@ -189,11 +193,34 @@ fun AppItem(
         Column(
             modifier = Modifier.weight(1f)
         ) {
-            Text(
-                text = app.appName,
-                style = MaterialTheme.typography.bodyLarge,
-                fontWeight = FontWeight.Medium
-            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = app.appName,
+                    style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f, fill = false)
+                )
+                
+                if (isFromPlayStore) {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.Store,
+                        contentDescription = "Play Store App",
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                } else {
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(
+                        imageVector = Icons.Default.Warning,
+                        contentDescription = "Non-Play Store App",
+                        tint = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            }
             
             Text(
                 text = app.packageName,

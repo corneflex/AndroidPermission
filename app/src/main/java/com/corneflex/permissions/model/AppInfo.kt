@@ -7,7 +7,8 @@ data class AppInfo(
     val packageName: String,
     val appName: String,
     val icon: android.graphics.drawable.Drawable?,
-    val permissions: List<PermissionInfo>
+    val permissions: List<PermissionInfo>,
+    val installerPackageName: String? = null
 )
 
 /**

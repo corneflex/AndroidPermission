@@ -47,6 +47,13 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     private val _whitelistFilterMode = MutableLiveData<WhitelistFilterMode>(WhitelistFilterMode.SHOW_ONLY_WHITELISTED)
     val whitelistFilterMode: LiveData<WhitelistFilterMode> = _whitelistFilterMode
 
+    // Play Store filter
+    private val _playStoreFilterActive = MutableLiveData<Boolean>(false)
+    val playStoreFilterActive: LiveData<Boolean> = _playStoreFilterActive
+    
+    private val _playStoreFilterMode = MutableLiveData<PlayStoreFilterMode>(PlayStoreFilterMode.SHOW_ONLY_PLAY_STORE)
+    val playStoreFilterMode: LiveData<PlayStoreFilterMode> = _playStoreFilterMode
+
     // Keep all permission groups in memory for faster searching
     private var allPermissionGroups = listOf<PermissionGroup>()
     
@@ -72,11 +79,17 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
                     _whitelistedApps.postValue(whitelistManager.getWhitelistedApps())
                     _regexPatterns.postValue(whitelistManager.getRegexPatterns())
                     
-                    // Apply filters if active
-                    val filteredApps = if (_isWhitelistFilterActive.value == true) {
-                        applyWhitelistFilter(allApps)
-                    } else {
-                        allApps
+                    // Apply filters
+                    var filteredApps = allApps
+                    
+                    // Apply whitelist filter if active
+                    if (_isWhitelistFilterActive.value == true) {
+                        filteredApps = applyWhitelistFilter(filteredApps)
+                    }
+                    
+                    // Apply Play Store filter if active
+                    if (_playStoreFilterActive.value == true) {
+                        filteredApps = applyPlayStoreFilter(filteredApps)
                     }
                     
                     _installedApps.postValue(filteredApps)
@@ -110,6 +123,21 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     }
     
     /**
+     * Apply Play Store filtering to apps list
+     */
+    private fun applyPlayStoreFilter(apps: List<AppInfo>): List<AppInfo> {
+        return when (_playStoreFilterMode.value) {
+            PlayStoreFilterMode.SHOW_ONLY_PLAY_STORE -> {
+                apps.filter { app -> AppPermissionUtils.isInstalledFromPlayStore(app) }
+            }
+            PlayStoreFilterMode.EXCLUDE_PLAY_STORE -> {
+                apps.filter { app -> !AppPermissionUtils.isInstalledFromPlayStore(app) }
+            }
+            else -> apps
+        }
+    }
+    
+    /**
      * Toggle whitelist filtering
      */
     fun toggleWhitelistFilter(enabled: Boolean) {
@@ -123,6 +151,24 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     fun setWhitelistFilterMode(mode: WhitelistFilterMode) {
         _whitelistFilterMode.value = mode
         if (_isWhitelistFilterActive.value == true) {
+            refreshData()
+        }
+    }
+    
+    /**
+     * Toggle Play Store filtering
+     */
+    fun togglePlayStoreFilter(enabled: Boolean) {
+        _playStoreFilterActive.value = enabled
+        refreshData()
+    }
+    
+    /**
+     * Set Play Store filter mode
+     */
+    fun setPlayStoreFilterMode(mode: PlayStoreFilterMode) {
+        _playStoreFilterMode.value = mode
+        if (_playStoreFilterActive.value == true) {
             refreshData()
         }
     }
@@ -226,11 +272,17 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
             
             try {
                 withContext(Dispatchers.IO) {
-                    // Apply filters if active
-                    val filteredApps = if (_isWhitelistFilterActive.value == true) {
-                        applyWhitelistFilter(allApps)
-                    } else {
-                        allApps
+                    // Apply filters
+                    var filteredApps = allApps
+                    
+                    // Apply whitelist filter if active
+                    if (_isWhitelistFilterActive.value == true) {
+                        filteredApps = applyWhitelistFilter(filteredApps)
+                    }
+                    
+                    // Apply Play Store filter if active
+                    if (_playStoreFilterActive.value == true) {
+                        filteredApps = applyPlayStoreFilter(filteredApps)
                     }
                     
                     _installedApps.postValue(filteredApps)
@@ -242,7 +294,7 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
                     // Update all permission groups for searching
                     allPermissionGroups = permissionGroups.values.flatten()
                     
-                    // Clear search if active
+                    // Update search if active
                     if (_isSearchActive.value == true) {
                         searchPermissions(_searchQuery.value ?: "")
                     }
@@ -330,5 +382,13 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     enum class WhitelistFilterMode {
         SHOW_ONLY_WHITELISTED,  // Show only whitelisted apps
         EXCLUDE_WHITELISTED     // Exclude whitelisted apps (blacklist mode)
+    }
+    
+    /**
+     * Play Store filter modes
+     */
+    enum class PlayStoreFilterMode {
+        SHOW_ONLY_PLAY_STORE,  // Show only apps installed from Play Store
+        EXCLUDE_PLAY_STORE     // Exclude apps installed from Play Store
     }
 } 
