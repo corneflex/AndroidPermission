@@ -14,6 +14,11 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.PlayArrow
@@ -25,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -45,16 +51,36 @@ import com.corneflex.permissions.model.AppInfo
 import com.corneflex.permissions.model.PermissionGroup
 import com.corneflex.permissions.util.AppPermissionUtils
 import com.corneflex.permissions.viewmodel.AppPermissionsViewModel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.snapshotFlow
 
 @Composable
 fun PermissionGroupsList(
     permissionGroups: List<PermissionGroup>,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onScrollStarted: (() -> Unit)? = null
 ) {
-    Column(
+    // Always use LazyColumn for efficient scrolling and recycling
+    val listState = rememberLazyListState()
+    
+    // Monitor scroll state and notify parent when scrolling begins
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.isScrollInProgress }
+            .collect { isScrolling ->
+                if (isScrolling) {
+                    onScrollStarted?.invoke()
+                }
+            }
+    }
+    
+    LazyColumn(
+        state = listState,
         modifier = modifier.padding(horizontal = 16.dp)
     ) {
-        permissionGroups.forEach { permissionGroup ->
+        items(
+            items = permissionGroups,
+            key = { it.permissionInfo.name } // Use permission name as key for stable identity
+        ) { permissionGroup ->
             PermissionGroupItem(
                 permissionGroup = permissionGroup,
                 modifier = Modifier

@@ -93,32 +93,27 @@ fun AppPermissionsScreen(
     // Search bar active state
     var searchBarActive by remember { mutableStateOf(false) }
     
-    // Scrolling state
-    val scrollState = rememberScrollState()
-    val focusManager = LocalFocusManager.current
-    
     // Animation state for filter menu
     val filterMenuVisibleState = remember { MutableTransitionState(false) }
     filterMenuVisibleState.targetState = showFilterMenu
     
-    // Track scroll position changes and close filter menu with animation when scrolling starts
-    val isScrolling by remember { derivedStateOf { scrollState.isScrollInProgress } }
-    LaunchedEffect(isScrolling) {
-        if (isScrolling) {
-            if (showFilterMenu) {
-                showFilterMenu = false
-            }
-            if (searchBarActive) {
-                searchBarActive = false
-                focusManager.clearFocus()
-            }
-        }
-    }
+    val focusManager = LocalFocusManager.current
     
     // Load data when the screen is first shown
     DisposableEffect(lifecycleOwner) {
         viewModel.loadInstalledApps()
         onDispose { }
+    }
+    
+    // Function to handle scroll events
+    val handleScrollStart = {
+        if (showFilterMenu) {
+            showFilterMenu = false
+        }
+        if (searchBarActive) {
+            searchBarActive = false
+            focusManager.clearFocus()
+        }
     }
     
     Scaffold(
@@ -137,7 +132,7 @@ fun AppPermissionsScreen(
             )
         }
     ) { paddingValues ->
-        // Main content column that's scrollable
+        // Main content box without scrolling - scrolling handled by LazyColumn
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -153,9 +148,7 @@ fun AppPermissionsScreen(
                 }
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .verticalScroll(scrollState)
+                modifier = Modifier.fillMaxSize()
             ) {
                 // Single filter card (only shown when toggled) with animation
                 AnimatedVisibility(
@@ -189,7 +182,7 @@ fun AppPermissionsScreen(
                     }
                 }
                 
-                // Custom Search Bar (replacing SearchBar)
+                // Custom Search Bar
                 CustomSearchBar(
                     query = searchQuery,
                     onQueryChange = { viewModel.searchPermissions(it) },
@@ -206,20 +199,25 @@ fun AppPermissionsScreen(
                         .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
                 
-                if (isLoading) {
-                    LoadingScreen()
-                } else if (isSearchActive) {
-                    // Show search results
-                    SearchResultsScreen(
-                        searchResults = searchResults,
-                        searchQuery = searchQuery
-                    )
-                } else {
-                    // Show categorized permissions
-                    PermissionsTabs(
-                        permissionsByDangerLevel = permissionsByDangerLevel,
-                        modifier = Modifier.fillMaxWidth()
-                    )
+                // Content area (fills remaining space)
+                Box(modifier = Modifier.weight(1f)) {
+                    if (isLoading) {
+                        LoadingScreen()
+                    } else if (isSearchActive) {
+                        // Show search results
+                        SearchResultsScreen(
+                            searchResults = searchResults,
+                            searchQuery = searchQuery,
+                            onScrollStarted = handleScrollStart
+                        )
+                    } else {
+                        // Show categorized permissions
+                        PermissionsTabs(
+                            permissionsByDangerLevel = permissionsByDangerLevel,
+                            modifier = Modifier.fillMaxWidth(),
+                            onScrollStarted = handleScrollStart
+                        )
+                    }
                 }
             }
         }
@@ -370,6 +368,7 @@ fun CustomSearchBar(
 fun SearchResultsScreen(
     searchResults: List<PermissionGroup>,
     searchQuery: String,
+    onScrollStarted: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(modifier = modifier) {
@@ -396,10 +395,11 @@ fun SearchResultsScreen(
                 )
             }
         } else {
-            // Display search results without using weight
+            // Display search results with LazyColumn
             PermissionGroupsList(
                 permissionGroups = searchResults,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
+                onScrollStarted = onScrollStarted
             )
         }
     }
@@ -420,6 +420,7 @@ private fun LoadingScreen(modifier: Modifier = Modifier) {
 @Composable
 fun PermissionsTabs(
     permissionsByDangerLevel: Map<DangerLevel, List<PermissionGroup>>,
+    onScrollStarted: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     // Skip empty categories
@@ -450,11 +451,12 @@ fun PermissionsTabs(
             val selectedDangerLevel = keys[selectedTabIndex]
             val permissionGroups = nonEmptyCategories[selectedDangerLevel] ?: emptyList()
             
-            // Use Box instead of weight to prevent issues with scrolling
-            Box(modifier = Modifier.fillMaxWidth()) {
+            // Use LazyColumn for efficient list rendering
+            Box(modifier = Modifier.weight(1f)) {
                 PermissionGroupsList(
                     permissionGroups = permissionGroups,
-                    modifier = Modifier
+                    modifier = Modifier.fillMaxSize(),
+                    onScrollStarted = onScrollStarted
                 )
             }
         }
