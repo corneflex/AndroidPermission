@@ -6,6 +6,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.content.pm.PermissionInfo
 import android.os.Build
+import android.util.LruCache
 import com.corneflex.permissions.model.AppInfo
 import com.corneflex.permissions.model.DangerLevel
 import com.corneflex.permissions.model.PermissionInfo as AppPermissionInfo
@@ -18,6 +19,15 @@ object AppPermissionUtils {
     // Google Play Store installer package
     const val PLAY_STORE_INSTALLER_PACKAGE = "com.android.vending"
     
+    // Cache for app installer information to avoid repeated PackageManager calls
+    private val installerCache = LruCache<String, String?>(200)
+    
+    // Cache for system app status to avoid repeated PackageManager calls
+    private val systemAppCache = LruCache<String, Boolean>(200)
+    
+    // Cache for permission info to avoid repeated parsing
+    private val permissionInfoCache = LruCache<String, AppPermissionInfo>(500)
+    
     /**
      * Get all installed apps on the device with their permissions
      * @param context Android context
@@ -25,13 +35,25 @@ object AppPermissionUtils {
      */
     fun getInstalledApps(context: Context): List<AppInfo> {
         val packageManager = context.packageManager
-        val installedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS or PackageManager.GET_META_DATA)
+        val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            PackageManager.GET_PERMISSIONS or PackageManager.GET_META_DATA
         } else {
             @Suppress("DEPRECATION")
-            packageManager.getInstalledPackages(PackageManager.GET_PERMISSIONS)
+            PackageManager.GET_PERMISSIONS
+        }
+        
+        val installedPackages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            packageManager.getInstalledPackages(flags)
+        } else {
+            @Suppress("DEPRECATION")
+            packageManager.getInstalledPackages(flags)
         }
 
+        // Clear caches if they're getting too large
+        if (installerCache.size() > 150) installerCache.evictAll()
+        if (systemAppCache.size() > 150) systemAppCache.evictAll()
+        if (permissionInfoCache.size() > 400) permissionInfoCache.evictAll()
+        
         return installedPackages.mapNotNull { packageInfo ->
             createAppInfo(packageManager, packageInfo, context)
         }
@@ -41,42 +63,51 @@ object AppPermissionUtils {
      * Create an AppInfo object from a PackageInfo
      */
     private fun createAppInfo(packageManager: PackageManager, packageInfo: PackageInfo, context: Context): AppInfo? {
-        // Set the isSystemApp flag
-        val isSystem = (packageInfo.applicationInfo?.flags?.and(ApplicationInfo.FLAG_SYSTEM) != 0)
-        
-        // Skip system apps if needed - commented out to allow showing system apps
-        // if (isSystem) {
-        //     return null
-        // }
+        try {
+            val appName = packageInfo.applicationInfo?.loadLabel(packageManager).toString()
+            val packageName = packageInfo.packageName
+            val icon = packageInfo.applicationInfo?.loadIcon(packageManager)
+            val permissions = getPermissionsForPackage(packageManager, packageInfo)
+            
+            // Get the installer package name (from cache if available)
+            val installerPackageName = installerCache.get(packageName) ?: run {
+                val installer = getInstallerPackageName(context, packageName)
+                installerCache.put(packageName, installer)
+                installer
+            }
 
-        val appName = packageInfo.applicationInfo?.loadLabel(packageManager).toString()
-        val packageName = packageInfo.packageName
-        val icon = packageInfo.applicationInfo?.loadIcon(packageManager)
-        val permissions = getPermissionsForPackage(packageManager, packageInfo)
-        
-        // Get the installer package name
-        val installerPackageName = getInstallerPackageName(context, packageName)
-
-        return AppInfo(
-            packageName = packageName,
-            appName = appName,
-            icon = icon,
-            permissions = permissions,
-            installerPackageName = installerPackageName
-        )
+            return AppInfo(
+                packageName = packageName,
+                appName = appName,
+                icon = icon,
+                permissions = permissions,
+                installerPackageName = installerPackageName
+            )
+        } catch (e: Exception) {
+            // Skip this app if we encounter errors
+            return null
+        }
     }
     
     /**
      * Check if an app is a system app
      */
     fun isSystemApp(app: AppInfo, context: Context): Boolean {
-        return try {
+        // Check cache first
+        val cached = systemAppCache.get(app.packageName)
+        if (cached != null) return cached
+        
+        val result = try {
             val packageManager = context.packageManager
             val applicationInfo = packageManager.getApplicationInfo(app.packageName, 0)
             (applicationInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
         } catch (e: Exception) {
             false
         }
+        
+        // Cache the result
+        systemAppCache.put(app.packageName, result)
+        return result
     }
     
     /**
@@ -116,6 +147,13 @@ object AppPermissionUtils {
         val declaredPermissions = packageInfo.requestedPermissions ?: return emptyList()
         
         for (permission in declaredPermissions) {
+            // Check if we have this permission info cached
+            val cachedPermInfo = permissionInfoCache.get(permission)
+            if (cachedPermInfo != null) {
+                permissionList.add(cachedPermInfo)
+                continue
+            }
+            
             try {
                 val permissionInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     packageManager.getPermissionInfo(permission, PackageManager.GET_META_DATA)
@@ -127,22 +165,27 @@ object AppPermissionUtils {
                 val dangerLevel = getDangerLevel(permissionInfo)
                 val description = permissionInfo.loadDescription(packageManager)?.toString()
                 
-                permissionList.add(
-                    AppPermissionInfo(
-                        name = permission,
-                        description = description,
-                        dangerLevel = dangerLevel
-                    )
+                val appPermInfo = AppPermissionInfo(
+                    name = permission,
+                    description = description,
+                    dangerLevel = dangerLevel
                 )
+                
+                // Cache this permission info
+                permissionInfoCache.put(permission, appPermInfo)
+                permissionList.add(appPermInfo)
+                
             } catch (e: PackageManager.NameNotFoundException) {
                 // Permission not found, add with unknown level
-                permissionList.add(
-                    AppPermissionInfo(
-                        name = permission,
-                        description = null,
-                        dangerLevel = DangerLevel.UNKNOWN
-                    )
+                val appPermInfo = AppPermissionInfo(
+                    name = permission,
+                    description = null,
+                    dangerLevel = DangerLevel.UNKNOWN
                 )
+                
+                // Cache this permission info
+                permissionInfoCache.put(permission, appPermInfo)
+                permissionList.add(appPermInfo)
             }
         }
         

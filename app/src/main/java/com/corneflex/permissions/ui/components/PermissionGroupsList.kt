@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -35,6 +34,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -46,13 +46,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.corneflex.permissions.model.AppInfo
 import com.corneflex.permissions.model.PermissionGroup
 import com.corneflex.permissions.util.AppPermissionUtils
-import com.corneflex.permissions.viewmodel.AppPermissionsViewModel
-import kotlinx.coroutines.flow.collect
-import kotlinx.coroutines.flow.snapshotFlow
 
 @Composable
 fun PermissionGroupsList(

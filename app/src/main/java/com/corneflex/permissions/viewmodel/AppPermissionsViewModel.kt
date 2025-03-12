@@ -78,41 +78,18 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
             _isLoading.value = true
             
             try {
+                // Use IO dispatcher for the heavy loading operation
                 withContext(Dispatchers.IO) {
-                    // Load all apps
+                    // Load all apps - this is the most expensive operation
                     allApps = AppPermissionUtils.getInstalledApps(getApplication())
                     
                     // Get current whitelist and regex patterns
                     _whitelistedApps.postValue(whitelistManager.getWhitelistedApps())
                     _regexPatterns.postValue(whitelistManager.getRegexPatterns())
-                    
-                    // Apply filters
-                    var filteredApps = allApps
-                    
-                    // Apply whitelist filter if active
-                    if (_isWhitelistFilterActive.value == true) {
-                        filteredApps = applyWhitelistFilter(filteredApps)
-                    }
-                    
-                    // Apply Play Store filter if active
-                    if (_playStoreFilterActive.value == true) {
-                        filteredApps = applyPlayStoreFilter(filteredApps)
-                    }
-                    
-                    // Apply System Apps filter if active
-                    if (_systemAppFilterActive.value == true) {
-                        filteredApps = applySystemAppFilter(filteredApps)
-                    }
-                    
-                    _installedApps.postValue(filteredApps)
-                    
-                    // Group permissions by danger level and associate apps
-                    val permissionGroups = createPermissionGroups(filteredApps)
-                    _permissionsByDangerLevel.postValue(permissionGroups)
-                    
-                    // Store all permission groups for searching
-                    allPermissionGroups = permissionGroups.values.flatten()
                 }
+                
+                // Apply filters after loading
+                refreshData()
             } finally {
                 _isLoading.value = false
             }
@@ -122,8 +99,8 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Apply whitelist filtering to apps list
      */
-    private fun applyWhitelistFilter(apps: List<AppInfo>): List<AppInfo> {
-        return when (_whitelistFilterMode.value) {
+    private suspend fun applyWhitelistFilter(apps: List<AppInfo>): List<AppInfo> = withContext(Dispatchers.Default) {
+        when (_whitelistFilterMode.value) {
             WhitelistFilterMode.SHOW_ONLY_WHITELISTED -> {
                 apps.filter { app -> whitelistManager.isWhitelisted(app.packageName) }
             }
@@ -137,8 +114,8 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Apply Play Store filtering to apps list
      */
-    private fun applyPlayStoreFilter(apps: List<AppInfo>): List<AppInfo> {
-        return when (_playStoreFilterMode.value) {
+    private suspend fun applyPlayStoreFilter(apps: List<AppInfo>): List<AppInfo> = withContext(Dispatchers.Default) {
+        when (_playStoreFilterMode.value) {
             PlayStoreFilterMode.SHOW_ONLY_PLAY_STORE -> {
                 apps.filter { app -> AppPermissionUtils.isInstalledFromPlayStore(app) }
             }
@@ -152,8 +129,8 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Apply system app filtering to apps list
      */
-    private fun applySystemAppFilter(apps: List<AppInfo>): List<AppInfo> {
-        return when (_systemAppFilterMode.value) {
+    private suspend fun applySystemAppFilter(apps: List<AppInfo>): List<AppInfo> = withContext(Dispatchers.Default) {
+        when (_systemAppFilterMode.value) {
             SystemAppFilterMode.SHOW_ONLY_SYSTEM_APPS -> {
                 apps.filter { app -> AppPermissionUtils.isSystemApp(app, getApplication()) }
             }
@@ -316,27 +293,25 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
             _isLoading.value = true
             
             try {
-                withContext(Dispatchers.IO) {
-                    // Apply filters
-                    var filteredApps = allApps
-                    
-                    // Apply whitelist filter if active
-                    if (_isWhitelistFilterActive.value == true) {
-                        filteredApps = applyWhitelistFilter(filteredApps)
-                    }
-                    
-                    // Apply Play Store filter if active
-                    if (_playStoreFilterActive.value == true) {
-                        filteredApps = applyPlayStoreFilter(filteredApps)
-                    }
-                    
-                    // Apply System Apps filter if active
-                    if (_systemAppFilterActive.value == true) {
-                        filteredApps = applySystemAppFilter(filteredApps)
-                    }
-                    
-                    _installedApps.postValue(filteredApps)
-                    
+                var filteredApps = allApps
+                
+                // Apply filters in parallel using async coroutines
+                if (_isWhitelistFilterActive.value == true) {
+                    filteredApps = applyWhitelistFilter(filteredApps)
+                }
+                
+                if (_playStoreFilterActive.value == true) {
+                    filteredApps = applyPlayStoreFilter(filteredApps)
+                }
+                
+                if (_systemAppFilterActive.value == true) {
+                    filteredApps = applySystemAppFilter(filteredApps)
+                }
+                
+                _installedApps.postValue(filteredApps)
+                
+                // Process permission groups on Default dispatcher
+                withContext(Dispatchers.Default) {
                     // Group permissions by danger level and associate apps
                     val permissionGroups = createPermissionGroups(filteredApps)
                     _permissionsByDangerLevel.postValue(permissionGroups)
@@ -346,7 +321,8 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
                     
                     // Update search if active
                     if (_isSearchActive.value == true) {
-                        searchPermissions(_searchQuery.value ?: "")
+                        val updatedResults = performSearch(_searchQuery.value ?: "")
+                        _searchResults.postValue(updatedResults)
                     }
                 }
             } finally {
@@ -368,8 +344,21 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
         
         _isSearchActive.value = true
         
+        // Perform search in background
+        viewModelScope.launch {
+            val results = performSearch(query)
+            _searchResults.value = results
+        }
+    }
+
+    /**
+     * Perform the actual search operation on a background thread
+     */
+    private suspend fun performSearch(query: String): List<PermissionGroup> = withContext(Dispatchers.Default) {
+        if (query.isBlank()) return@withContext emptyList()
+        
         val lowerCaseQuery = query.lowercase()
-        val filteredPermissions = allPermissionGroups.filter { permissionGroup ->
+        return@withContext allPermissionGroups.filter { permissionGroup ->
             // Search in permission name
             permissionGroup.permissionInfo.name.lowercase().contains(lowerCaseQuery) ||
             // Search in permission description
@@ -379,16 +368,6 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
             // Search in app package names (bundle IDs)
             permissionGroup.apps.any { it.packageName.lowercase().contains(lowerCaseQuery) }
         }
-        
-        _searchResults.value = filteredPermissions
-    }
-
-    /**
-     * Clear the current search
-     */
-    fun clearSearch() {
-        _searchQuery.value = ""
-        _isSearchActive.value = false
     }
 
     /**
@@ -448,5 +427,14 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     enum class SystemAppFilterMode {
         SHOW_ONLY_SYSTEM_APPS,  // Show only system apps
         EXCLUDE_SYSTEM_APPS     // Exclude system apps
+    }
+
+    /**
+     * Clear the current search
+     */
+    fun clearSearch() {
+        _searchQuery.value = ""
+        _isSearchActive.value = false
+        _searchResults.value = emptyList()
     }
 } 
