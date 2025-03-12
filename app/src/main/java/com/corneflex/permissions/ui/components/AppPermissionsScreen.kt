@@ -1,5 +1,14 @@
 package com.corneflex.permissions.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
@@ -27,6 +36,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
@@ -65,9 +75,14 @@ fun AppPermissionsScreen(
     val scrollState = rememberScrollState()
     val focusManager = LocalFocusManager.current
     
-    // Close filter menu when scrolling
-    LaunchedEffect(scrollState.isScrollInProgress) {
-        if (scrollState.isScrollInProgress && showFilterMenu) {
+    // Animation state for filter menu
+    val filterMenuVisibleState = remember { MutableTransitionState(false) }
+    filterMenuVisibleState.targetState = showFilterMenu
+    
+    // Track scroll position changes and close filter menu with animation when scrolling starts
+    val isScrolling by remember { derivedStateOf { scrollState.isScrollInProgress } }
+    LaunchedEffect(isScrolling) {
+        if (isScrolling && showFilterMenu) {
             showFilterMenu = false
         }
     }
@@ -114,8 +129,21 @@ fun AppPermissionsScreen(
                     .fillMaxSize()
                     .verticalScroll(scrollState)
             ) {
-                // Single filter card (only shown when toggled)
-                if (showFilterMenu) {
+                // Single filter card (only shown when toggled) with animation
+                AnimatedVisibility(
+                    visibleState = filterMenuVisibleState,
+                    enter = slideInVertically(
+                        initialOffsetY = { -it }, // Slide in from top
+                        animationSpec = spring(
+                            dampingRatio = Spring.DampingRatioMediumBouncy,
+                            stiffness = Spring.StiffnessMedium
+                        )
+                    ) + fadeIn(animationSpec = tween(150)),
+                    exit = slideOutVertically(
+                        targetOffsetY = { -it }, // Slide out to top
+                        animationSpec = tween(200)
+                    ) + fadeOut(animationSpec = tween(150))
+                ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
