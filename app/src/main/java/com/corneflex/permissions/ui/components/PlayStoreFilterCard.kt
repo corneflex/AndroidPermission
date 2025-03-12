@@ -1,5 +1,6 @@
 package com.corneflex.permissions.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -53,13 +54,14 @@ fun PlayStoreFilterCard(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Filter toggle
+            // Filter toggle with clickable text
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { viewModel.togglePlayStoreFilter(!isPlayStoreFilterActive) }
             ) {
                 Checkbox(
                     checked = isPlayStoreFilterActive,
-                    onCheckedChange = { viewModel.togglePlayStoreFilter(it) }
+                    onCheckedChange = null // Handled by the row's clickable modifier
                 )
                 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -77,14 +79,16 @@ fun PlayStoreFilterCard(
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
                 
+                // Show only Play Store apps (clickable row)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { 
+                        viewModel.setPlayStoreFilterMode(AppPermissionsViewModel.PlayStoreFilterMode.SHOW_ONLY_PLAY_STORE) 
+                    }
                 ) {
                     RadioButton(
                         selected = playStoreFilterMode == AppPermissionsViewModel.PlayStoreFilterMode.SHOW_ONLY_PLAY_STORE,
-                        onClick = { 
-                            viewModel.setPlayStoreFilterMode(AppPermissionsViewModel.PlayStoreFilterMode.SHOW_ONLY_PLAY_STORE) 
-                        }
+                        onClick = null // Handled by the row's clickable modifier
                     )
                     
                     Spacer(modifier = Modifier.width(4.dp))
@@ -92,14 +96,16 @@ fun PlayStoreFilterCard(
                     Text("Show only Play Store apps")
                 }
                 
+                // Exclude Play Store apps (clickable row)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { 
+                        viewModel.setPlayStoreFilterMode(AppPermissionsViewModel.PlayStoreFilterMode.EXCLUDE_PLAY_STORE) 
+                    }
                 ) {
                     RadioButton(
                         selected = playStoreFilterMode == AppPermissionsViewModel.PlayStoreFilterMode.EXCLUDE_PLAY_STORE,
-                        onClick = { 
-                            viewModel.setPlayStoreFilterMode(AppPermissionsViewModel.PlayStoreFilterMode.EXCLUDE_PLAY_STORE) 
-                        }
+                        onClick = null // Handled by the row's clickable modifier
                     )
                     
                     Spacer(modifier = Modifier.width(4.dp))

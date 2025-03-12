@@ -1,5 +1,6 @@
 package com.corneflex.permissions.ui.components
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -76,13 +77,14 @@ fun WhitelistManagerCard(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Whitelist toggle
+            // Whitelist toggle with clickable text
             Row(
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.clickable { viewModel.toggleWhitelistFilter(!isWhitelistActive) }
             ) {
                 Checkbox(
                     checked = isWhitelistActive,
-                    onCheckedChange = { viewModel.toggleWhitelistFilter(it) }
+                    onCheckedChange = null // Handled by the row's clickable modifier
                 )
                 
                 Spacer(modifier = Modifier.width(8.dp))
@@ -100,14 +102,16 @@ fun WhitelistManagerCard(
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
                 
+                // Show only whitelisted apps (clickable row)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { 
+                        viewModel.setWhitelistFilterMode(AppPermissionsViewModel.WhitelistFilterMode.SHOW_ONLY_WHITELISTED)
+                    }
                 ) {
                     RadioButton(
                         selected = whitelistMode == AppPermissionsViewModel.WhitelistFilterMode.SHOW_ONLY_WHITELISTED,
-                        onClick = { 
-                            viewModel.setWhitelistFilterMode(AppPermissionsViewModel.WhitelistFilterMode.SHOW_ONLY_WHITELISTED) 
-                        }
+                        onClick = null // Handled by the row's clickable modifier
                     )
                     
                     Spacer(modifier = Modifier.width(4.dp))
@@ -115,14 +119,16 @@ fun WhitelistManagerCard(
                     Text("Show only whitelisted apps")
                 }
                 
+                // Exclude whitelisted apps (clickable row)
                 Row(
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.clickable { 
+                        viewModel.setWhitelistFilterMode(AppPermissionsViewModel.WhitelistFilterMode.EXCLUDE_WHITELISTED)
+                    }
                 ) {
                     RadioButton(
                         selected = whitelistMode == AppPermissionsViewModel.WhitelistFilterMode.EXCLUDE_WHITELISTED,
-                        onClick = { 
-                            viewModel.setWhitelistFilterMode(AppPermissionsViewModel.WhitelistFilterMode.EXCLUDE_WHITELISTED) 
-                        }
+                        onClick = null // Handled by the row's clickable modifier
                     )
                     
                     Spacer(modifier = Modifier.width(4.dp))
