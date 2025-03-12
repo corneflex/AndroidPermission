@@ -1,13 +1,17 @@
 package com.corneflex.permissions.ui.components
 
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
-import androidx.compose.material.icons.filled.FilterList
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -15,12 +19,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SearchBar
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.runtime.mutableIntStateOf
@@ -29,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
@@ -53,6 +61,17 @@ fun AppPermissionsScreen(
     // Filter toggle
     var showFilterMenu by remember { mutableStateOf(false) }
     
+    // Scrolling state
+    val scrollState = rememberScrollState()
+    val focusManager = LocalFocusManager.current
+    
+    // Close filter menu when scrolling
+    LaunchedEffect(scrollState.isScrollInProgress) {
+        if (scrollState.isScrollInProgress && showFilterMenu) {
+            showFilterMenu = false
+        }
+    }
+    
     // Load data when the screen is first shown
     DisposableEffect(lifecycleOwner) {
         viewModel.loadInstalledApps()
@@ -67,7 +86,7 @@ fun AppPermissionsScreen(
                     // Combined filter menu button
                     IconButton(onClick = { showFilterMenu = !showFilterMenu }) {
                         Icon(
-                            imageVector = Icons.Default.FilterList,
+                            imageVector = Icons.Default.Menu,
                             contentDescription = "Filter Options"
                         )
                     }
@@ -75,45 +94,70 @@ fun AppPermissionsScreen(
             )
         }
     ) { paddingValues ->
-        Column(
+        // Main content column that's scrollable
+        Box(
             modifier = Modifier
-                .padding(paddingValues)
                 .fillMaxSize()
+                .padding(paddingValues)
+                // Handle taps outside the filter menu
+                .pointerInput(Unit) {
+                    detectTapGestures {
+                        if (showFilterMenu) {
+                            showFilterMenu = false
+                            focusManager.clearFocus()
+                        }
+                    }
+                }
         ) {
-            // Single filter card (only shown when toggled)
-            if (showFilterMenu) {
-                WhitelistManagerCard(
-                    viewModel = viewModel,
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(scrollState)
+            ) {
+                // Single filter card (only shown when toggled)
+                if (showFilterMenu) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            // Prevent clicks from passing through the filter menu
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = { /* consume the click */ })
+                            }
+                    ) {
+                        WhitelistManagerCard(
+                            viewModel = viewModel,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        )
+                    }
+                }
+                
+                // Search bar
+                PermissionSearchBar(
+                    searchQuery = searchQuery,
+                    onSearchQueryChange = { viewModel.searchPermissions(it) },
+                    onClearSearch = { viewModel.clearSearch() },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 8.dp)
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 )
-            }
-            
-            // Search bar
-            PermissionSearchBar(
-                searchQuery = searchQuery,
-                onSearchQueryChange = { viewModel.searchPermissions(it) },
-                onClearSearch = { viewModel.clearSearch() },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
-            )
-            
-            if (isLoading) {
-                LoadingScreen()
-            } else if (isSearchActive) {
-                // Show search results
-                SearchResultsScreen(
-                    searchResults = searchResults,
-                    searchQuery = searchQuery
-                )
-            } else {
-                // Show categorized permissions
-                PermissionsTabs(
-                    permissionsByDangerLevel = permissionsByDangerLevel,
-                    modifier = Modifier.weight(1f)
-                )
+                
+                if (isLoading) {
+                    LoadingScreen()
+                } else if (isSearchActive) {
+                    // Show search results
+                    SearchResultsScreen(
+                        searchResults = searchResults,
+                        searchQuery = searchQuery
+                    )
+                } else {
+                    // Show categorized permissions
+                    PermissionsTabs(
+                        permissionsByDangerLevel = permissionsByDangerLevel,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                }
             }
         }
     }
@@ -189,7 +233,7 @@ fun SearchResultsScreen(
     searchQuery: String,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxSize()) {
+    Column(modifier = modifier) {
         // Search results count
         Text(
             text = "${searchResults.size} result${if (searchResults.size != 1) "s" else ""} for \"$searchQuery\"",
@@ -201,7 +245,9 @@ fun SearchResultsScreen(
         if (searchResults.isEmpty()) {
             // No results found
             Box(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 32.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -211,10 +257,10 @@ fun SearchResultsScreen(
                 )
             }
         } else {
-            // Display search results
+            // Display search results without using weight
             PermissionGroupsList(
                 permissionGroups = searchResults,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.fillMaxWidth()
             )
         }
     }
@@ -223,7 +269,9 @@ fun SearchResultsScreen(
 @Composable
 private fun LoadingScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 64.dp),
         contentAlignment = Alignment.Center
     ) {
         CircularProgressIndicator()
@@ -263,10 +311,13 @@ fun PermissionsTabs(
             val selectedDangerLevel = keys[selectedTabIndex]
             val permissionGroups = nonEmptyCategories[selectedDangerLevel] ?: emptyList()
             
-            PermissionGroupsList(
-                permissionGroups = permissionGroups,
-                modifier = Modifier.weight(1f)
-            )
+            // Use Box instead of weight to prevent issues with scrolling
+            Box(modifier = Modifier.fillMaxWidth()) {
+                PermissionGroupsList(
+                    permissionGroups = permissionGroups,
+                    modifier = Modifier
+                )
+            }
         }
     }
 }
@@ -274,7 +325,9 @@ fun PermissionsTabs(
 @Composable
 private fun EmptyScreen(modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.fillMaxSize(),
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 64.dp),
         contentAlignment = Alignment.Center
     ) {
         Text("No permissions found")

@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.Store
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Card
 import androidx.compose.material3.Divider
@@ -206,7 +206,7 @@ fun AppItem(
                 if (isFromPlayStore) {
                     Spacer(modifier = Modifier.width(4.dp))
                     Icon(
-                        imageVector = Icons.Default.Store,
+                        imageVector = Icons.Default.PlayArrow,
                         contentDescription = "Play Store App",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier.size(16.dp)

@@ -203,8 +203,8 @@ class AppPermissionsViewModel(application: Application) : AndroidViewModel(appli
     /**
      * Toggle system app filtering
      */
-    fun toggleSystemAppFilter(enabled: Boolean) {
-        _systemAppFilterActive.value = enabled
+    fun toggleSystemAppFilter() {
+        _systemAppFilterActive.value = !(_systemAppFilterActive.value ?: false)
         refreshData()
     }
     
