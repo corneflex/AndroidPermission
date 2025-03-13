@@ -16,7 +16,16 @@ An Android application that scans all installed apps on your device and categori
 
 ## Screenshots
 
-_(Screenshots will be added soon)_
+<table>
+  <tr>
+    <td><img src="docs/pictures/permissions.png" alt="Permissions View" width="300"/></td>
+    <td><img src="docs/pictures/apps.png" alt="Apps View" width="300"/></td>
+  </tr>
+  <tr>
+    <td><b>Permissions View</b>: Categorized permissions by danger level</td>
+    <td><b>Apps View</b>: Details of apps using specific permissions</td>
+  </tr>
+</table>
 
 ## Requirements
 
